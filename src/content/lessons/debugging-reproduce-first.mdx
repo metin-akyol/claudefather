@@ -1,0 +1,97 @@
+---
+title: "Debugging with AI: reproduce first, then hypothesise"
+summary: "Asking the model to “fix the bug” gets you a plausible patch for a guessed cause. A reproduce-first loop finds the actual root cause, with prompts for each step."
+published: 2026-11-10
+topics: [debugging, workflow]
+level: intermediate
+tools: [Claude Code, Claude.ai]
+author: The Family
+---
+
+<Callout type="when">
+Bugs where the cause isn't obvious from the stack trace: intermittent failures, wrong-but-not-crashing output, "works locally, fails in CI." For an obvious null check, just ask for the fix.
+</Callout>
+
+Paste an error into a chat and say "fix it," and you'll usually get a fix. A null check, a try/catch, a retry. The error goes away. Whether the *bug* went away is another question.
+
+Models are very good at producing the most likely fix for an error message. They're much better debuggers when you make them work like an engineer: reproduce, form hypotheses, test them, and only then change code.
+
+## Step 1: Reproduce it with a failing test
+
+A failing test is the single most useful debugging artefact. It turns "I think it's fixed" into a fact, and it gives Claude a fast feedback loop to run on its own.
+
+<Prompt title="Reproduce first">
+
+```text
+Bug: invoices for customers in Australia/Sydney show the wrong due date
+(one day early) when created after 2pm local time.
+
+Don't fix anything yet. Write a failing test that reproduces this, as small
+as possible, in the existing invoice test file. Run it and show me it fails
+for the reason described, not for some unrelated reason.
+```
+
+</Prompt>
+
+Check the failure reason. A test that fails because of a typo in the setup proves nothing.
+
+## Step 2: Ask for hypotheses, ranked
+
+<Prompt title="Hypotheses before fixes">
+
+```text
+Now that we have a failing test: list 3–5 hypotheses for the root cause,
+ranked by likelihood. For each, name the evidence that would confirm or rule
+it out, and the cheapest way to check (a log line, a REPL call, reading a
+specific function). Don't change any code yet.
+```
+
+</Prompt>
+
+This stops the model locking onto its first guess. It also gives you a chance to contribute what you know: "It's not #2, we changed that last week and the bug predates it."
+
+## Step 3: Gather evidence, not patches
+
+Let Claude test the hypotheses: add temporary logging, run the test, inspect values. Tell it explicitly that the goal is evidence:
+
+```text
+Check hypothesis 1. Add temporary logging if needed and run the failing test.
+Report what you observed. If it's ruled out, move to hypothesis 2.
+```
+
+When the evidence points somewhere, ask Claude to explain the full causal chain, from input to wrong output. If it can't explain the chain, you haven't found the root cause yet.
+
+## Step 4: Fix the cause, keep the test
+
+```text
+Fix the root cause, not the symptom. Remove the temporary logging.
+Run the reproduction test plus the full invoice suite. Then tell me:
+- why this bug happened, in two sentences
+- whether the same pattern exists anywhere else in the codebase
+```
+
+That last question often finds the bug's siblings before your users do.
+
+<Callout type="warning">
+Watch for "fixes" that make the test pass by changing the test, catching and ignoring the exception, or special-casing the test input. Read the diff. If the fix is in the test file, ask why.
+</Callout>
+
+## Giving Claude the right evidence
+
+Paste the real thing, not your summary of it:
+
+- **The full stack trace**, not the last line
+- **Actual vs expected output**, concretely
+- **What changed recently** (`git log --oneline -20` on the relevant path is cheap and often decisive)
+- **Environment differences** for "works on my machine" bugs: versions, env vars, timezone, locale
+
+For intermittent bugs, ask Claude to write a loop that runs the test 200 times and reports the failure rate. That turns "flaky" into a number you can measure a fix against.
+
+<Exercise title="Re-debug a solved bug">
+
+1. Pick a bug your team fixed recently where you know the true root cause.
+2. Check out the commit before the fix.
+3. Run the loop: reproduce, hypotheses, evidence, fix. Give Claude only what the original reporter had.
+4. Did it find the real cause? Where did it go off track, and what would have steered it back?
+
+</Exercise>

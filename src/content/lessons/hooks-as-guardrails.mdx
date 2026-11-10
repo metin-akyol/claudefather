@@ -1,0 +1,112 @@
+---
+title: "Hooks as guardrails"
+summary: "Instructions are suggestions; hooks are guarantees. Use Claude Code hooks to auto-format, block edits to protected files, and run checks, deterministically, every time."
+published: 2026-11-10
+topics: [automation, claude-code]
+level: advanced
+tools: [Claude Code]
+author: The Family
+---
+
+<Callout type="when">
+When something must happen every time, not just usually. If you've written "ALWAYS run the formatter" in CLAUDE.md and it still sometimes doesn't, that rule wants to be a hook.
+</Callout>
+
+Instructions in `CLAUDE.md` are followed most of the time. Hooks are shell commands that Claude Code runs automatically at specific points in its lifecycle: before a tool runs, after it runs, when a session starts, when Claude finishes responding. They run every time, whatever the model decides.
+
+## Where hooks live
+
+Hooks are configured in Claude Code settings files. `.claude/settings.json` in the repo is shared with the team; `~/.claude/settings.json` is personal. The `/hooks` command in Claude Code lets you view and edit them interactively.
+
+The events you'll use most:
+
+| Event | Fires | Typical use |
+| --- | --- | --- |
+| `PreToolUse` | Before a tool call | Block dangerous commands or protected files |
+| `PostToolUse` | After a tool call succeeds | Format, lint, or type-check edited files |
+| `Stop` | When Claude finishes responding | Run tests, send a notification |
+| `SessionStart` | When a session begins | Inject context (current branch, open tickets) |
+
+There are more events, and the configuration schema evolves. **Check the current hooks reference in the Claude Code docs** before copying any example, including these.
+
+## Example 1: Format every edited file
+
+```json title=".claude/settings.json"
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path' | xargs npx prettier --write --ignore-unknown"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook receives JSON about the tool call on stdin, including the edited file's path. Now formatting is never the model's job, and you never review a formatting-only diff again.
+
+## Example 2: Protect files from edits
+
+A `PreToolUse` hook that exits with code `2` blocks the tool call, and its stderr is passed back to Claude as the reason. Here's a small script:
+
+```bash title=".claude/hooks/protect-files.sh"
+#!/usr/bin/env bash
+# Block edits to generated code, lockfiles, and (optionally) tests.
+file=$(jq -r '.tool_input.file_path // empty')
+
+case "$file" in
+  *src/generated/*|*package-lock.json|*pnpm-lock.yaml)
+    echo "Blocked: $file is generated. Run the generator instead." >&2
+    exit 2
+    ;;
+esac
+
+if [[ "${PROTECT_TESTS:-0}" == "1" && "$file" == *.test.* ]]; then
+  echo "Blocked: tests are frozen during implementation. Explain which test is wrong instead." >&2
+  exit 2
+fi
+
+exit 0
+```
+
+Register it with a `PreToolUse` entry whose matcher is `Edit|Write` and whose command is the script path. Start Claude with `PROTECT_TESTS=1 claude` during the implementation phase of [test-first development](/lessons/test-first-with-claude), and the model physically can't game its tests.
+
+<Callout type="warning">
+Hooks run arbitrary shell commands with your user's permissions. Review hook changes in PRs as carefully as you would a CI pipeline change, especially in shared `.claude/settings.json`.
+</Callout>
+
+## Example 3: Don't stop until it's green
+
+A `Stop` hook can run your fast checks when Claude says it's done. If the hook exits with code `2`, Claude Code feeds its output back to Claude and keeps it working instead of ending its turn:
+
+```bash title=".claude/hooks/verify.sh"
+#!/usr/bin/env bash
+if ! out=$(npm run -s typecheck 2>&1); then
+  echo "Typecheck failed. Fix before finishing:" >&2
+  echo "$out" | tail -30 >&2
+  exit 2
+fi
+```
+
+Keep `Stop` hooks fast, and make sure they can actually pass. A check that can never succeed will keep Claude looping. Confirm in the hooks docs how your version guards against repeated `Stop` blocks.
+
+## Hooks vs CLAUDE.md vs CI
+
+- **CLAUDE.md:** guidance and judgement. "Prefer X over Y."
+- **Hooks:** must-happen-every-time local rules. Formatting, protected paths, fast checks.
+- **CI:** the final gate for everyone, human or AI. Hooks don't replace it.
+
+<Exercise title="Your first two hooks">
+
+1. Add the formatter hook to `.claude/settings.json` in a repo you use daily, using your project's formatter.
+2. Add a `PreToolUse` guard for one path that should never be hand-edited in your repo.
+3. Test the guard: ask Claude to edit a protected file and check it gets blocked with your message.
+4. Commit both and mention them in the PR description so teammates know they exist.
+
+</Exercise>

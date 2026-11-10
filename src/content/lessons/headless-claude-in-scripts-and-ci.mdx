@@ -1,0 +1,96 @@
+---
+title: "Headless Claude: scripts, pipes and CI"
+summary: "Claude Code doesn't need a human at the keyboard. Use print mode to wire it into shell scripts, git hooks and CI jobs, with the permissions and cost limits that make that safe."
+published: 2026-11-10
+topics: [automation, claude-code]
+level: advanced
+tools: [Claude Code, GitHub Actions]
+author: The Family
+---
+
+<Callout type="when">
+Repetitive, well-defined jobs you'd otherwise do by hand across many files or many PRs: triaging lint failures, drafting changelogs, migrating call sites, labelling issues. Not for anything where you'd want to review each step as it happens.
+</Callout>
+
+The interactive terminal is the most common way to use Claude Code, but not the only one. With **print mode** (`-p`), Claude takes a prompt, does the work, prints the result and exits. That makes it composable with everything else in your toolbox.
+
+## The basics
+
+```bash
+# One-shot question
+claude -p "Summarise what changed in the last 10 commits on this branch"
+
+# Pipe data in
+git diff main...HEAD | claude -p "Write a concise PR description for this diff"
+
+# Machine-readable output for scripts
+claude -p "List TODO comments in src/ as JSON: file, line, text" --output-format json
+```
+
+With `--output-format json` you get a JSON envelope including the result and run metadata, which is handy for scripts that need to check success or log cost. Run `claude --help` to see the flags your installed version supports.
+
+## Permissions: be explicit
+
+An interactive session can ask you before running a command. A headless one can't, so decide up front what it may do. Use the allow and deny tool options (see `claude --help`) or a project settings file to grant exactly the tools the job needs:
+
+```bash
+claude -p "Fix the ESLint errors in src/components. Run eslint to confirm." \
+  --allowedTools "Read,Edit,Bash(npx eslint:*)"
+```
+
+<Callout type="warning">
+Avoid blanket permission-skipping flags outside a disposable sandbox (a container or CI runner with no production credentials). A headless agent with unrestricted shell access and your cloud credentials is a bad day waiting to happen.
+</Callout>
+
+## Pattern: fan out across files
+
+For large mechanical changes, loop over files and give each one a small, focused task. Each run gets a clean context, which beats one giant session:
+
+```bash
+#!/usr/bin/env bash
+# Migrate each file off the deprecated logger, one Claude run per file.
+grep -rl "from 'legacy-logger'" src/ | while read -r f; do
+  echo "→ $f"
+  claude -p "In $f, replace legacy-logger with our logger from src/lib/log.ts.
+Keep log levels and messages identical. Edit only this file." \
+    --allowedTools "Read,Edit" --max-turns 8
+done
+npm run typecheck && npm test
+```
+
+Then review the combined diff like any other PR. Test on two or three files before running it across hundreds.
+
+## Pattern: Claude in GitHub Actions
+
+Anthropic publishes a GitHub Action for Claude Code that can respond to `@claude` mentions in issues and PRs, or run on events like `pull_request`. The quickest setup is to run `/install-github-app` inside Claude Code, which walks you through installing the app and adding the API key secret.
+
+Things to decide before you turn it on:
+
+- **Trigger.** On every PR, or only when someone mentions it? Mentions are less noisy to start with.
+- **Scope.** Can it push commits, or only comment? Start with comment-only.
+- **Cost.** Every run uses API tokens. Set turn limits and watch usage for the first few weeks.
+- **Data.** Your code is sent to the model provider. Confirm that's within your org's policy.
+
+## Pattern: local git hooks
+
+A `prepare-commit-msg` hook can draft commit messages from the staged diff:
+
+```bash title=".git/hooks/prepare-commit-msg"
+#!/usr/bin/env bash
+# Only when no message was supplied (plain `git commit`)
+[ -z "$2" ] || exit 0
+git diff --cached | claude -p "Write a conventional commit message for this diff. \
+Subject line max 72 chars, then a blank line, then 1-3 bullet points. Output only the message." > "$1"
+```
+
+Keep local hooks optional (not every teammate will have Claude Code installed) and fast, or people will bypass them with `--no-verify`.
+
+<Exercise title="Automate one chore">
+
+1. Pick a chore you did by hand this week that touched many files or PRs.
+2. Write it as a single `claude -p` command with the narrowest `--allowedTools` that works.
+3. Run it on one item and inspect the result. Tighten the prompt.
+4. Wrap it in a loop or script, run it on three items, review the diff.
+5. Share the script in your team channel, or turn it into a lesson request.
+
+</Exercise>

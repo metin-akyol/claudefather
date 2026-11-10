@@ -1,0 +1,102 @@
+---
+title: "The wider toolbox: where other AI tools fit"
+summary: "Claude isn't the only AI tool worth having. A map of the main categories (completions, AI editors, review bots, MCP integrations, research tools) and how to decide what earns a place in your setup."
+published: 2026-11-10
+topics: [tooling]
+level: foundation
+tools: [Various]
+author: The Family
+---
+
+<Callout type="note" title="Snapshot, not gospel">
+This space changes month to month. Products named here are examples of categories as of this lesson's date, not endorsements. Check current features, pricing and your org's approved-tools list before adopting anything.
+</Callout>
+
+There's no single best AI tool. There are jobs, and tools that are good at them. The useful question isn't "Claude or X?" but "what's the right tool for *this* job, and does adding it pay for the context-switching?"
+
+## The categories
+
+### Inline completions
+
+- **Job:** finish the line or block you're typing, in your editor, with near-zero friction.
+- **Examples:** GitHub Copilot, plus completion features built into most AI editors.
+- **Good for:** boilerplate, repetitive patterns, test cases that follow an obvious shape.
+- **Weak at:** anything that needs understanding beyond the open files.
+
+### AI-native editors and IDE agents
+
+- **Job:** chat, multi-file edits, and agent tasks without leaving the editor.
+- **Examples:** Cursor, Windsurf, Copilot's agent mode in VS Code, and the Claude Code extensions for VS Code and JetBrains.
+- **Good for:** staying in a visual diff-review flow; people who prefer GUI over terminal.
+
+### Terminal and autonomous coding agents
+
+- **Job:** take a task, explore the repo, edit, run commands, iterate.
+- **Examples:** Claude Code, plus other vendors' CLI agents.
+- **Good for:** multi-step tasks, scripting and CI (see [Headless Claude](/lessons/headless-claude-in-scripts-and-ci)), working across many files.
+
+### AI code review
+
+- **Job:** comment on pull requests automatically.
+- **Examples:** Claude Code's GitHub Action, Copilot code review, and dedicated services like CodeRabbit.
+- **Good for:** a fast first pass on every PR. See [AI-assisted code review](/lessons/ai-assisted-code-review) for tuning advice.
+
+### MCP integrations
+
+- **Job:** connect AI tools to your systems: issue trackers, databases, observability, docs.
+- **What it is:** the Model Context Protocol is an open standard for plugging tools and data sources into AI applications. Many clients support it, including Claude Code, Claude Desktop and several editors, so one integration can serve several tools.
+- **Good for:** "look at the Sentry error for this ticket and find the cause" without copy-pasting between five tabs.
+
+<Callout type="warning">
+An MCP server can read data and, depending on its tools, take actions with whatever credentials you give it. Prefer official or well-maintained servers, use read-only credentials where possible, and treat a third-party server like any other dependency with access to your systems.
+</Callout>
+
+### Research and reading
+
+- **Job:** answer questions with sources; digest long documents.
+- **Examples:** chat assistants with web search (Claude.ai included), and tools built around your own document sets.
+- **Good for:** technology comparisons, reading RFCs and long specs, summarising incident docs. Always click through to the source. See [Docs and research, with receipts](/lessons/docs-and-research-with-receipts).
+
+## The boring tools still matter most
+
+AI tools are most effective in repos with strong conventional tooling, because the model can use it to check its own work:
+
+- **Fast tests** give the model a feedback loop
+- **Strict type checking** catches invented APIs instantly
+- **Linters and formatters** handle style so neither you nor the model argues about it
+- **Good error messages** in your own code make AI debugging dramatically better
+
+If you can improve one thing to get better AI results, it's often the test suite's speed, not a new AI tool.
+
+## Choosing: a quick rubric
+
+Before adopting a new tool, answer:
+
+1. **What job does it do better than what we have?** Be specific about the task.
+2. **What does it cost in context switching?** Another window, another set of rules files, another subscription.
+3. **Where does our code go?** Data retention, training policy, and whether it's on the approved list.
+4. **Does it share config?** Tools that read a common rules file such as `AGENTS.md`, or support MCP, fit into an existing setup more easily.
+5. **Can we try it on a real task for a week?** Opinions from demos aren't evidence.
+
+<Prompt title="Evaluate a tool against our workflow">
+
+```text
+I'm evaluating [TOOL] for our team. We currently use [CURRENT SETUP].
+Our stack: [STACK]. Our biggest time sinks: [LIST].
+
+Based on what you know, which of our time sinks might it help with, and
+which won't it touch? Mark anything about its features, pricing or data
+policy as "verify on their site". Your knowledge may be out of date.
+Then suggest a one-week trial plan with a concrete success measure.
+```
+
+</Prompt>
+
+<Exercise title="Audit your own toolbox">
+
+1. List every AI tool you used in the last two weeks and the job you used it for.
+2. Mark any overlaps: two tools doing the same job.
+3. Find one job you do by hand that a category above covers.
+4. Run a one-week trial with a concrete measure, then share the result as a lesson request or comment.
+
+</Exercise>

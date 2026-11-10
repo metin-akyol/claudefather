@@ -1,0 +1,101 @@
+---
+title: "Explore, plan, code, verify: the core loop"
+summary: "The four-step loop behind almost every reliable AI-assisted change, why skipping steps is where things go wrong, and how to run it in Claude Code."
+published: 2026-11-10
+topics: [workflow, claude-code]
+level: foundation
+tools: [Claude Code]
+featured: true
+author: The Family
+---
+
+<Callout type="when">
+Any change that spans several files, touches code you don't know well, or would take you more than about 20 minutes by hand. For a typo fix, just ask for the fix.
+</Callout>
+
+When AI-assisted changes go badly, the cause is nearly always the same: the model started editing before it understood the code. It patched the symptom in the file it happened to open first, invented a helper that already exists two directories over, or broke a caller it never looked at.
+
+The fix is a loop with four distinct phases. Don't let them blur together.
+
+## 1. Explore: read before writing
+
+Ask Claude to investigate and report back, with no edits. Be explicit about that, because an eager model will start fixing things the moment it sees a problem.
+
+<Prompt title="Explore without editing">
+
+```text
+I need to add soft-delete to the Project model. Don't write any code yet.
+
+Investigate and report:
+- Where Project is defined, created, queried and deleted
+- Any existing soft-delete pattern elsewhere in the codebase we should copy
+- Tests that cover project deletion
+- Anything that would break if deleted projects stopped appearing in queries
+
+Keep the report under 30 lines, with file paths.
+```
+
+</Prompt>
+
+That report is valuable on its own. Read it. If it missed something you know about, say so now, while correcting it is cheap.
+
+## 2. Plan: agree on the approach
+
+Next, ask for a plan: which files change, in what order, and what the risky parts are. In Claude Code, **plan mode** enforces this. Claude can read and search but not edit until you approve. Cycle into it with <kbd>Shift</kbd>+<kbd>Tab</kbd> (the current mode shows at the bottom of the prompt). Worth verifying the shortcut in your version, since keybindings have changed between releases.
+
+A good plan is short enough to actually review. If it's two pages long, the task is too big. Split it.
+
+<Callout type="tip">
+Push back on plans. "Why a new table instead of a column?" or "What about the admin export, which reads projects directly?" Plans are where your knowledge of the system pays off most.
+</Callout>
+
+## 3. Code: execute in small, checkable steps
+
+Once the plan is right, let it work. Two habits help:
+
+- **One plan step at a time** for risky changes, with a quick look between steps.
+- **Commit at green checkpoints.** If step 4 goes sideways, `git reset` to step 3 instead of asking the model to undo its own work. Models are worse at reverting than git is.
+
+## 4. Verify: make the work prove itself
+
+"Done" means verified, not "the model says it's done." Give Claude a way to check its own work and tell it to use it:
+
+<Prompt title="Verify before reporting">
+
+```text
+Before telling me you're done:
+1. Run the test suite for the projects module and fix any failures
+2. Run the type checker
+3. Show me one query that previously returned a deleted project and now doesn't
+Report what you ran and the actual results. Don't summarise them as "all good."
+```
+
+</Prompt>
+
+Then do your own verification: read the diff, run the app, and try the edge case you were worried about. AI output looks confident whether it's right or wrong, so the prose summary is not evidence.
+
+## Why the loop works
+
+Each phase produces something small you can check: a report, a plan, a diff, test output. You catch mistakes when they're cheap. Skipping explore and plan feels faster, and for small tasks it is. For anything bigger, the time you save up front comes back as debugging later.
+
+## Scaling the loop down
+
+For a medium task, collapse it into a single prompt:
+
+```text
+Look at how pagination works in src/api/users.ts, then add the same pagination
+to src/api/teams.ts. Tell me your plan in 3 bullets before editing. After
+editing, run the teams tests.
+```
+
+That's still all four phases, just compressed.
+
+<Exercise title="Run the loop on a real ticket">
+
+1. Pick a ticket from your backlog that touches 3+ files.
+2. Run explore with no edits. Note one thing the report surfaced that you didn't know.
+3. Get a plan and push back on at least one decision.
+4. Implement, committing at each green step.
+5. Verify with tests and a manual check. Afterwards, write down which phase caught the most problems.
+
+</Exercise>

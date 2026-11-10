@@ -1,0 +1,215 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* ------------------------------------------------------------------ */
+/* Design tokens                                                       */
+/* ------------------------------------------------------------------ */
+@theme {
+  --color-bg: #0a0908;
+  --color-surface: #13110f;
+  --color-elevated: #1b1815;
+  --color-line: rgb(237 225 205 / 0.09);
+  --color-line-strong: rgb(237 225 205 / 0.16);
+  --color-fg: #eee7db;
+  --color-muted: #a49b8d;
+  --color-subtle: #6f675c;
+  --color-gold: #d6ab52;
+  --color-gold-bright: #f2cd7a;
+  --color-wine: #7d1d24;
+  --color-wine-bright: #c2414c;
+  --color-sage: #8fb08a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-playfair), ui-serif, Georgia, serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-bg);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-bg font-sans text-fg antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: rgb(214 171 82 / 0.35);
+    color: #fff;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Film-grain + vignette used behind hero sections. */
+@utility grain {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.07;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@utility animate-rise {
+  animation: rise 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* ------------------------------------------------------------------ */
+/* Lesson prose                                                        */
+/* ------------------------------------------------------------------ */
+.lesson-prose {
+  --tw-prose-body: rgb(238 231 219 / 0.86);
+  --tw-prose-headings: var(--color-fg);
+  --tw-prose-lead: var(--color-muted);
+  --tw-prose-links: var(--color-gold-bright);
+  --tw-prose-bold: var(--color-fg);
+  --tw-prose-counters: var(--color-gold);
+  --tw-prose-bullets: var(--color-gold);
+  --tw-prose-hr: var(--color-line);
+  --tw-prose-quotes: var(--color-fg);
+  --tw-prose-quote-borders: var(--color-gold);
+  --tw-prose-code: var(--color-fg);
+  --tw-prose-th-borders: var(--color-line-strong);
+  --tw-prose-td-borders: var(--color-line);
+}
+.lesson-prose :where(h2) {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 6rem;
+}
+.lesson-prose :where(h3) {
+  scroll-margin-top: 6rem;
+}
+.lesson-prose :where(a) {
+  text-decoration-color: rgb(214 171 82 / 0.4);
+  text-underline-offset: 3px;
+}
+.lesson-prose :where(a):hover {
+  text-decoration-color: var(--color-gold);
+}
+
+/* Inline code */
+.lesson-prose :where(:not(pre) > code),
+.callout-body :where(code),
+.exercise-body :where(:not(pre) > code) {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.15em 0.4em;
+  border-radius: 6px;
+  background: rgb(237 225 205 / 0.07);
+  border: 1px solid var(--color-line);
+}
+.lesson-prose :where(:not(pre) > code)::before,
+.lesson-prose :where(:not(pre) > code)::after {
+  content: none;
+}
+
+/* Code blocks (rehype-pretty-code output) */
+figure[data-rehype-pretty-code-figure] {
+  margin: 1.75rem 0;
+}
+figure[data-rehype-pretty-code-figure] pre {
+  margin: 0;
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+  background: #0f0d0c;
+  padding: 1.1rem 0;
+  font-size: 0.85rem;
+  line-height: 1.7;
+}
+figure[data-rehype-pretty-code-figure] code {
+  display: grid;
+  font-family: var(--font-mono);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+figure[data-rehype-pretty-code-figure] [data-line] {
+  padding: 0 1.25rem;
+}
+figure[data-rehype-pretty-code-figure] figcaption {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-bottom: 0.5rem;
+}
+/* Prompts read as prose, so wrap them instead of scrolling sideways. */
+.prompt-card figure[data-rehype-pretty-code-figure] {
+  margin: 0;
+}
+.prompt-card pre {
+  border: 0 !important;
+  background: transparent !important;
+}
+.prompt-card [data-line] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Markdown inside callouts / exercises */
+.callout-body > * + *,
+.exercise-body > * + * {
+  margin-top: 0.75rem;
+}
+.callout-body :where(ul, ol),
+.exercise-body :where(ul, ol) {
+  padding-left: 1.25rem;
+}
+.callout-body ul,
+.exercise-body ul {
+  list-style: disc;
+}
+.callout-body ol,
+.exercise-body ol {
+  list-style: decimal;
+}
+.callout-body li + li,
+.exercise-body li + li {
+  margin-top: 0.35rem;
+}
+.callout-body a,
+.exercise-body a {
+  color: var(--color-gold-bright);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.exercise-body strong,
+.callout-body strong {
+  color: var(--color-fg);
+  font-weight: 600;
+}

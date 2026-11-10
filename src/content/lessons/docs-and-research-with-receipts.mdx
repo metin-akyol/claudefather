@@ -1,0 +1,102 @@
+---
+title: "Docs and research, with receipts"
+summary: "Use AI to explain unfamiliar code, write documentation people actually read, and research technical questions, while keeping it honest about what it actually knows."
+published: 2026-11-10
+topics: [docs-research]
+level: intermediate
+tools: [Claude Code, Claude.ai]
+author: The Family
+---
+
+<Callout type="when">
+Onboarding onto an unfamiliar service, writing a README or ADR, or answering "which library should we use for X?" Be most careful with anything version-specific or recent. That's where models are most confidently wrong.
+</Callout>
+
+AI is excellent at reading code and explaining it, and at drafting prose. It's unreliable at recalling exact facts: API signatures, version numbers, release dates, who said what. The workflow below leans on the first and guards against the second.
+
+## Explaining unfamiliar code
+
+The trick is to ask for explanations *grounded in specific files*, not general knowledge:
+
+<Prompt title="Explain this service, with file references">
+
+```text
+I'm new to the notifications service. Explain how a notification gets from
+an API call to a delivered email. Trace the actual code path: for each step
+give the file and function name. Note anything surprising or non-obvious,
+like retries, queues, or feature flags. Keep it under 40 lines.
+If you're inferring something rather than reading it in the code, say so.
+```
+
+</Prompt>
+
+The last sentence is doing real work. Models blend what they read with what's typical. Asking them to flag inference separates the two.
+
+Follow up by spot-checking: open two of the referenced functions and confirm they do what the summary says. If both check out, trust the rest more. If one doesn't, ask why.
+
+## Writing documentation
+
+Models write fluent docs. The risk is fluent docs that are wrong, or so long nobody reads them. Constrain both:
+
+<Prompt title="Draft a README from the code">
+
+```text
+Draft a README for packages/rate-limiter for a developer who needs to use it
+within 10 minutes. Sections: what it does (2 sentences), install, the most
+common usage example, configuration options (table: name, type, default,
+description), and gotchas.
+
+Rules:
+- Every config option must come from the actual code. Cite the file
+- Every code example must be something you have checked compiles against the
+  current exports
+- Under 150 lines. Skip marketing language
+```
+
+</Prompt>
+
+For **architecture decision records**, give Claude the discussion (PR thread, Slack export, meeting notes) and ask it to draft the ADR in your template. It's good at extracting the decision and alternatives from a messy thread. You check that the stated reasons are the real ones.
+
+## Researching technical questions
+
+For "how does X work" or "which approach should we use," the model's training data has a cutoff and its recall of specifics is imperfect. Make it show its sources:
+
+<Prompt title="Research with receipts">
+
+```text
+I need to choose between server-sent events and WebSockets for live
+dashboard updates (Next.js on Vercel, ~500 concurrent users).
+
+Give me a comparison table, then a recommendation. Rules:
+- Separate what you're confident about from what you're unsure of
+- For any claim about platform limits, pricing, or version support, mark it
+  "VERIFY" and say where I'd check it
+- Don't invent links. If you can't name a real source, say so
+```
+
+</Prompt>
+
+If your tool has web search or can fetch documentation (Claude Code can fetch URLs, and MCP servers can connect it to docs), ask it to check the current official docs and quote the relevant line.
+
+<Callout type="warning">
+Version-specific answers are the riskiest category. If the model says a function exists or a flag is supported, check it against the docs for the version in your lockfile, not the latest version and not the model's memory.
+</Callout>
+
+## Keeping docs current
+
+Docs rot because updating them is nobody's job. You can make it part of the change:
+
+```text
+This branch changes the retry behaviour. Find any docs, READMEs, or
+comments that describe the old behaviour and update them in this branch.
+List what you changed.
+```
+
+<Exercise title="Onboard yourself">
+
+1. Pick a part of the codebase you've never worked in.
+2. Run the "explain with file references" prompt.
+3. Spot-check three claims against the code. Score them right, partially right, or wrong.
+4. Turn the corrected explanation into a short `ARCHITECTURE.md` or section of the README, and open a PR. The next person who's new to it will thank you.
+
+</Exercise>

@@ -1,0 +1,114 @@
+---
+title: "Write a CLAUDE.md that actually helps"
+summary: "CLAUDE.md is loaded into every Claude Code session. What belongs in it, what doesn't, and a template you can adapt in fifteen minutes."
+published: 2026-11-10
+topics: [claude-code, context]
+level: foundation
+tools: [Claude Code]
+featured: true
+author: The Family
+---
+
+<Callout type="when">
+Any repo where more than one person uses Claude Code, or where you've corrected Claude on the same thing twice. If you're repeating yourself, it belongs in the file.
+</Callout>
+
+Claude Code reads `CLAUDE.md` at the start of every session and treats it as standing instructions. It's the difference between onboarding a new contractor every morning and working with someone who already knows how your team does things.
+
+## Where the files live
+
+Claude Code looks in a few places and combines what it finds. The common ones:
+
+| Location | Scope | Commit it? |
+| --- | --- | --- |
+| `./CLAUDE.md` (repo root) | Everyone working in this repo | Yes |
+| `./some/subdir/CLAUDE.md` | Picked up when Claude works in that part of the tree | Yes |
+| `~/.claude/CLAUDE.md` | You, in every project | No, it's personal |
+
+Running `/init` in a repo generates a starting `CLAUDE.md` from the codebase. It's a reasonable first draft, but it's only a draft. Edit it down.
+
+<Callout type="note">
+The exact loading rules (imports, local overrides, nested directories) have changed over time. Check the current Claude Code memory docs if you depend on a specific behaviour.
+</Callout>
+
+## What belongs in it
+
+The test for every line: **would Claude get this wrong without it?** If not, delete it. Every line costs context in every session.
+
+Good candidates:
+
+- **Commands it can't guess.** How to run one test file, the lint command, the dev server, anything behind a Makefile or a non-standard script.
+- **Conventions that differ from the default.** "We use `zod` for validation, not hand-written guards." "Errors are returned, not thrown, in `src/core`."
+- **Landmines.** "Never edit files in `src/generated/`; run `npm run codegen` instead." "The `legacy/` folder is deprecated; don't add to it."
+- **Definition of done.** "Before finishing, run `npm run typecheck && npm test`."
+- **Architecture in a sentence or two** and where the important things live.
+
+## What doesn't belong
+
+- **Things the code already says.** Don't list every directory. Claude can run `ls`.
+- **Generic advice.** "Write clean, maintainable code" changes nothing.
+- **Long documentation.** Link to it instead: "API conventions: see `docs/api.md`." Claude will read it when it's relevant.
+- **Secrets.** It's a committed file read by a tool that sends content to a model. Treat it accordingly.
+
+## A template
+
+```markdown
+# Project: billing-service
+
+TypeScript (Node 22), Fastify, Postgres via Drizzle. Deployed on Vercel.
+
+## Commands
+- `pnpm dev`: local server on :3000 (needs `docker compose up db` first)
+- `pnpm test path/to/file.test.ts`: run one test file (prefer this over the full suite)
+- `pnpm typecheck && pnpm lint`: must pass before you say you're done
+
+## Conventions
+- Money is always integer cents (`amountCents`), never floats
+- DB access only through `src/db/repositories/*`; no queries in route handlers
+- Validation with zod schemas in `src/schemas/`; reuse before creating new ones
+- Errors: return `Result<T, AppError>` in `src/core`; only throw at the HTTP boundary
+
+## Don't
+- Edit `src/db/migrations/*` by hand. Use `pnpm db:generate`
+- Add dependencies without asking
+
+## Pointers
+- Domain glossary: docs/glossary.md
+- How invoicing works end to end: docs/invoicing.md
+```
+
+That's about 25 lines, and each one prevents a specific, recurring mistake.
+
+## Keep it alive
+
+A stale `CLAUDE.md` is worse than none, because it confidently teaches the wrong thing. Two habits:
+
+1. **When you correct Claude twice on the same thing, add a line.** You can ask Claude to do it: "Add a rule to CLAUDE.md so you don't do that again. Keep it to one line."
+2. **Review it in PRs like code.** When a convention changes, the `CLAUDE.md` diff belongs in the same PR.
+
+<Prompt title="Audit an existing CLAUDE.md">
+
+```text
+Read CLAUDE.md and then skim the codebase to check it against reality.
+Report:
+1. Instructions that are out of date or contradicted by the code
+2. Lines that are generic and could be deleted without changing your behaviour
+3. Up to 5 things you had to figure out from the code that should be in the file
+Don't edit the file. Give me the list and I'll decide.
+```
+
+</Prompt>
+
+## Other tools have the same idea
+
+This pattern isn't Claude-specific. Many coding agents read a similar file. `AGENTS.md` is a widely used cross-tool convention, and editors like Cursor have their own rules files. If your team uses several tools, keep the shared rules in one file and reference it from the others, so they don't drift apart.
+
+<Exercise title="Fifteen-minute CLAUDE.md">
+
+1. In a repo you work in daily, run `/init` (or start from the template above).
+2. Delete every line that fails the "would Claude get this wrong without it?" test.
+3. Add the three corrections you've made most often in recent sessions.
+4. Start a fresh session and give it a small real task. Did it use the commands and conventions without being told?
+5. Commit it and ask a teammate to review it like code.
+
+</Exercise>

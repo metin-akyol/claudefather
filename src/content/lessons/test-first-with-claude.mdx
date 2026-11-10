@@ -1,0 +1,110 @@
+---
+title: "Test-first development with Claude"
+summary: "Tests are the clearest spec you can give a model, and the only reliable way to check its work. A TDD loop for AI-assisted coding, and how to stop the model gaming its own tests."
+published: 2026-11-10
+topics: [testing, workflow]
+level: intermediate
+tools: [Claude Code]
+author: The Family
+---
+
+<Callout type="when">
+Logic with clear inputs and outputs: parsers, calculations, validation, state machines, API handlers. Less useful for UI layout or exploratory prototypes, where you don't know the expected behaviour yet.
+</Callout>
+
+Prose specs are ambiguous. Tests aren't. When you hand Claude a set of failing tests and say "make these pass," you've given it an unambiguous target and a way to check itself. That's a much better position than "implement the discount logic" plus hope.
+
+## The loop
+
+1. **Write the tests** (you, Claude, or both), and confirm they fail.
+2. **Commit the tests.**
+3. **Implement** until they pass, *without modifying the tests*.
+4. **Review** the implementation and the tests for gaps.
+
+Step 2 matters more than it looks. Committed tests make it obvious, in the diff, if anything touches them later.
+
+## Step 1: Generate tests from behaviour, not code
+
+<Prompt title="Write the tests first">
+
+```text
+We're adding a discount engine in src/pricing/discounts.ts (doesn't exist yet).
+
+Rules:
+- Percentage codes: 1–50% off the subtotal
+- Fixed codes: amount off in cents, never reducing the total below 0
+- One code per order; expired codes are rejected with ExpiredCodeError
+- Discounts apply before tax
+
+Write tests only, in src/pricing/discounts.test.ts, following the style of
+src/pricing/tax.test.ts. Cover the edge cases: 0%, 50%, fixed > subtotal,
+expiry boundary (expires exactly now). Don't create the implementation.
+Run the tests and confirm they fail because the module doesn't exist.
+```
+
+</Prompt>
+
+**Read the tests before moving on.** This is where your judgement matters most. Are the expected values right? Is anything missing? It's much easier to review 15 test cases than 200 lines of implementation.
+
+## Step 3: Implement against a fixed target
+
+<Prompt title="Implement without touching tests">
+
+```text
+Implement src/pricing/discounts.ts so all tests in discounts.test.ts pass.
+Do not modify the test file. If you believe a test is wrong, stop and tell me
+which one and why instead of changing it.
+Run the tests after each meaningful change.
+```
+
+</Prompt>
+
+That "stop and tell me" clause matters. Without it, a model that's stuck will sometimes "fix" the test.
+
+<Callout type="warning" title="Watch for test gaming">
+Signs the model is optimising for green rather than correct:
+
+- Test file appears in the diff
+- Special cases that match test inputs exactly (`if (code === "SAVE10")`)
+- Assertions loosened (`toEqual` became `toBeDefined`)
+- Tests skipped or marked as expected failures
+
+A PreToolUse hook can block edits to test files during implementation. See [Hooks as guardrails](/lessons/hooks-as-guardrails).
+</Callout>
+
+## Step 4: Ask for the tests you didn't write
+
+Once green, use Claude adversarially:
+
+<Prompt title="Find the gaps">
+
+```text
+Look at discounts.ts and discounts.test.ts together. What inputs would
+break this implementation that the tests don't cover? List them. Then write
+tests for the 3 most likely to happen in production. Don't change the
+implementation yet. I want to see them fail first.
+```
+
+</Prompt>
+
+## Adding tests to existing code
+
+For legacy code with no tests, flip the loop: characterise first.
+
+```text
+Write characterisation tests for src/legacy/shipping.ts that capture its
+CURRENT behaviour, including anything that looks like a bug (mark those with
+a "// suspicious:" comment). Don't change shipping.ts.
+```
+
+Now you have a safety net, and a list of suspicious behaviour to triage.
+
+<Exercise title="One function, test-first">
+
+1. Pick a small piece of logic you need to build this week.
+2. Write the rules in plain language and have Claude generate failing tests only.
+3. Review and correct the tests, then commit them.
+4. Have Claude implement with the "don't modify tests" instruction.
+5. Run the "find the gaps" prompt. How many real gaps did it find?
+
+</Exercise>

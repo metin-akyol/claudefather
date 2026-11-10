@@ -1,0 +1,113 @@
+---
+title: "The anatomy of a coding prompt"
+summary: "Most bad AI output comes from underspecified requests. A five-part structure that gets usable code on the first or second try, plus how to tell when you're over-prompting."
+published: 2026-11-10
+topics: [prompting]
+level: foundation
+tools: [Claude Code, Claude.ai, Any LLM]
+featured: true
+author: The Family
+---
+
+<Callout type="when">
+Any time you ask an AI tool for code that touches more than one function. For one-liners and autocomplete, skip the structure. It costs more than it saves.
+</Callout>
+
+The model can't see your Jira ticket, the Slack thread where the API contract was agreed, or the fact that your team hates ORMs. Everything it doesn't know, it guesses, and it guesses toward the average of the internet. A good prompt replaces those guesses with facts.
+
+## The five parts
+
+You rarely need all five, but run through them before sending anything non-trivial:
+
+1. **Goal.** What should be true when this is done, in terms of behaviour rather than implementation. "Users can reset a password via an emailed link that expires after 30 minutes."
+2. **Context.** Where the relevant code lives and what it already does. Point at files (`src/auth/tokens.ts`) instead of describing them.
+3. **Constraints.** What you *don't* want. Libraries to avoid, patterns to follow, files that must not change, performance budgets.
+4. **Done criteria.** How you and the model will know it worked: a test that passes, a command that succeeds, an example input and expected output.
+5. **Output shape.** What you want back: a plan first, a diff, just the function, an explanation of trade-offs.
+
+## Before and after
+
+A typical first attempt:
+
+```text
+add rate limiting to the api
+```
+
+The model will invent a library, guess at limits, and probably add middleware to every route, including the health check your load balancer hits every two seconds.
+
+The same request, with the parts filled in:
+
+<Prompt title="Feature request, fully specified">
+
+```text
+Goal: Add rate limiting to the public REST API so a single API key can't
+exceed 100 requests per minute.
+
+Context:
+- Routes are registered in src/server/routes.ts
+- We already use Redis (client in src/lib/redis.ts) for sessions
+- API keys are resolved in src/server/middleware/auth.ts
+
+Constraints:
+- No new dependencies; implement a fixed-window counter on the existing Redis client
+- Don't rate limit /health or /metrics
+- Follow the error format in src/server/errors.ts (429 with a Retry-After header)
+
+Done when:
+- A unit test shows the 101st request in a minute gets a 429
+- `npm test` and `npm run typecheck` pass
+
+First, show me a short plan and the files you'll touch. Don't edit anything
+until I confirm.
+```
+
+</Prompt>
+
+It's longer, but you'll spend less total time than with three rounds of "no, not like that."
+
+## Ask for the plan first
+
+That last line, *show me a plan, don't edit yet*, is the cheapest quality lever there is. Correcting a wrong approach in a five-line plan takes seconds. Correcting it after 300 lines of generated code means reading all 300 lines first.
+
+In Claude Code you can get the same effect structurally with plan mode, which keeps Claude read-only while it investigates and proposes. The [Explore, plan, code, verify](/lessons/explore-plan-code-verify) lesson covers that loop in depth.
+
+## Let it ask you questions
+
+For anything where you're unsure of the requirements yourself, flip the direction:
+
+<Prompt title="Interview me first">
+
+```text
+I want to add CSV export to the reports page. Before proposing anything,
+ask me up to 5 questions about requirements and edge cases that would change
+how you'd build it. Ask them all at once, numbered.
+```
+
+</Prompt>
+
+The questions it asks are often the ones your product manager forgot too.
+
+## Signs you're over-prompting
+
+More isn't always better. Cut back when:
+
+- **You're specifying the implementation line by line.** At that point, write the code yourself.
+- **The constraints contradict each other.** "Keep it minimal" plus eleven required features means the model has to pick which instruction to ignore.
+- **You're repeating things that are already in `CLAUDE.md`** or your project instructions. Put stable rules there once. See [Write a CLAUDE.md that actually helps](/lessons/claude-md-that-works).
+
+<Callout type="tip">
+Shouting ("YOU MUST", "NEVER EVER") was a workaround for older models. Current models follow plain instructions well, and over-emphasis can make them overly rigid. State the rule once, plainly, with the reason.
+</Callout>
+
+## Give the reason, not just the rule
+
+"Don't use `any`" gets followed literally. "Don't use `any`, because this module is the public SDK surface and users depend on the types" gets followed *and generalised*: the model will also avoid `unknown` casts and loose generics in that file. Reasons let the model handle the cases your rule didn't anticipate.
+
+<Exercise title="Rewrite your last prompt">
+
+1. Find the last non-trivial request you sent to an AI tool, ideally one that took several rounds.
+2. Rewrite it with all five parts. Be honest about which ones were missing.
+3. Send the new version in a fresh session against the same code and compare how many corrections it takes.
+4. Note which missing part caused the most rework. That's the one to build a habit around.
+
+</Exercise>

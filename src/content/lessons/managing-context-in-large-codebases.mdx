@@ -1,0 +1,96 @@
+---
+title: "Managing context on large codebases"
+summary: "Why long sessions get worse over time, and the practical moves that keep Claude sharp on big repos: scoping, clearing, compacting, and handing work to subagents."
+published: 2026-11-10
+topics: [context, claude-code]
+level: intermediate
+tools: [Claude Code]
+author: The Family
+---
+
+<Callout type="when">
+When sessions start strong and then degrade: Claude forgets an earlier instruction, re-reads files it already saw, or contradicts a decision from twenty minutes ago. That's usually a context problem, not a model problem.
+</Callout>
+
+Everything in a session (your messages, files Claude read, command output, its own replies) shares one context window. It's large but finite, and quality tends to drop well before it's full. Old, irrelevant material competes for attention with what matters now.
+
+You can't make the window bigger, but you can be deliberate about what's in it.
+
+## See what's using the space
+
+In Claude Code, `/context` shows a breakdown of what's currently in the window. Check it when a session feels sluggish. A single huge test log or a generated file read in full is often the cause.
+
+## Move 1: Scope the task, not the repo
+
+Don't ask Claude to "understand the codebase." Point it at the slice that matters:
+
+```text
+We're working only in services/checkout and packages/payments-client.
+Ignore the other services unless I mention them.
+```
+
+Naming the files you know are relevant saves a lot of exploratory reading. If you don't know which files matter, delegate that search (see Move 4).
+
+## Move 2: Clear between tasks
+
+`/clear` resets the conversation. Use it **between unrelated tasks**. Leftover context from the bug you fixed this morning won't help with this afternoon's feature, and it may actively mislead.
+
+The habit: finish a task, commit, `/clear`, start the next one. Your `CLAUDE.md` is loaded again in the new session, so you don't lose your standing instructions.
+
+## Move 3: Compact when you need continuity
+
+Sometimes you're mid-task and need to keep going. `/compact` replaces the conversation history with a summary. You can tell it what to keep:
+
+```text
+/compact Keep: the agreed plan, the list of files changed so far, and the
+failing test names. Drop: exploration output and old diffs.
+```
+
+Claude Code also compacts automatically as the window fills. Steering it yourself, earlier, gives better summaries than waiting for auto-compaction at the limit.
+
+<Callout type="tip">
+Before a risky compaction or a `/clear` mid-task, ask Claude to write the current plan and progress to a scratch file (e.g. `PLAN.md`). A file on disk survives any context reset, and a fresh session can pick up from it.
+</Callout>
+
+## Move 4: Delegate searches to subagents
+
+Subagents run in their own separate context and return only a summary. That makes them ideal for "go read 40 files and tell me the answer" jobs, where the 40 files never enter your main session.
+
+<Prompt title="Delegate an investigation">
+
+```text
+Use a subagent to find every place we construct a PaymentIntent, directly or
+through helpers, across the whole repo. Return only a table of
+file:line, the helper used, and whether idempotency keys are passed.
+Don't paste file contents back.
+```
+
+</Prompt>
+
+You can also define reusable subagents (for example a "test-runner" that runs the suite and reports only failures) as Markdown files under `.claude/agents/`. Check the Claude Code subagent docs for the current file format.
+
+## Move 5: Keep noisy output out
+
+Command output is context too. Ask for filtered output up front:
+
+- "Run the tests and show me only the failing test names and assertion messages."
+- "Grep for X and give me file paths only."
+- `npm test 2>&1 | tail -50` rather than the full log.
+
+## A large-repo session, end to end
+
+1. Fresh session. `CLAUDE.md` gives the conventions.
+2. Subagent investigation scoped to the relevant packages returns a short report.
+3. Plan in plan mode, then the plan gets saved to `PLAN.md`.
+4. Implement step by step, committing at green checkpoints.
+5. If it feels foggy: `/compact` with explicit keep/drop instructions.
+6. Done: commit, `/clear`.
+
+<Exercise title="Find your context hog">
+
+1. In your next long session, run `/context` when it first starts to feel sluggish.
+2. Identify the biggest contributor. Was it something you needed?
+3. Redo the same task in a fresh session using one of the moves above (scoped prompt, subagent search, or filtered output).
+4. Compare: did the second session need fewer corrections?
+
+</Exercise>

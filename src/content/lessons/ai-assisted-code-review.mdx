@@ -1,0 +1,89 @@
+---
+title: "AI-assisted code review, in both directions"
+summary: "How to review code an AI wrote, and how to use AI to review code anyone wrote, without drowning in nitpicks or rubber-stamping confident nonsense."
+published: 2026-11-10
+topics: [code-review, workflow]
+level: intermediate
+tools: [Claude Code, GitHub]
+author: The Family
+---
+
+<Callout type="when">
+Before opening any PR with significant AI-written code, and as a first pass on PRs you've been asked to review. AI review supplements human review. It doesn't replace it.
+</Callout>
+
+AI changes code review in two ways. More of the code you review was written by a model, and a model can do a first pass of review for you. Both need slightly different habits from traditional review.
+
+## Reviewing AI-written code
+
+AI-generated code fails differently from human code. It's rarely sloppy; it's *plausibly wrong*. Look specifically for:
+
+- **Invented APIs.** Methods or config options that don't exist in your version of the library. Type checking catches some; read the rest against the docs.
+- **Duplicated helpers.** A new `formatCurrency` when one already exists in `utils/`.
+- **Over-engineering.** Abstractions, options, and error handling nobody asked for.
+- **Silent scope creep.** "While I was there I also refactored…" changes hidden in a large diff.
+- **Swallowed errors.** `try { … } catch { return null }` that makes failures invisible.
+- **Tests that test the mock.** Assertions that pass whatever the real code does.
+
+<Callout type="tip">
+The author's responsibility doesn't change. If you open the PR, you own every line, and "Claude wrote it" isn't an answer to a review question. Read your own AI-written diffs before asking anyone else to.
+</Callout>
+
+## Self-review before you push
+
+Have a *fresh* session review the diff. The session that wrote the code is invested in its own choices, so a clean context is much more critical.
+
+<Prompt title="Fresh-eyes review of my branch">
+
+```text
+Review the changes on this branch against main (git diff main...HEAD).
+You didn't write this code. Review it as a skeptical senior engineer.
+
+Report only issues that matter, in this order:
+1. Bugs and incorrect behaviour (with a concrete failing scenario)
+2. Security problems
+3. Missing tests for important paths
+4. Duplication of existing helpers (name the existing one)
+
+Skip style nitpicks a linter would catch. For each issue: file:line,
+the problem, and a suggested fix. If you find nothing serious, say so.
+```
+
+</Prompt>
+
+The "concrete failing scenario" requirement is the important part. It filters out vague "consider adding error handling" comments and forces evidence.
+
+## Using AI to review others' PRs
+
+As a first pass, AI review is good at catching mechanical issues so your attention goes to design. Point it at the PR and ask it to summarise *and* to flag:
+
+<Prompt title="PR first pass for a human reviewer">
+
+```text
+Summarise PR #123 for me in 5 bullets: what it changes and why.
+Then list the 3 places where a human reviewer should look most carefully,
+and why. I'll do the actual review. Don't post anything to GitHub.
+```
+
+</Prompt>
+
+You still do the review; the model just helps you decide where to spend your attention.
+
+## Automating review in CI
+
+You can run Claude in CI to review every PR automatically. Anthropic publishes a GitHub Action for Claude Code, and running `/install-github-app` inside Claude Code walks you through installing it. Many teams also use dedicated AI review services. See [The wider toolbox](/lessons/the-wider-toolbox).
+
+If you automate it:
+
+- **Tune for signal.** An automated reviewer that posts 15 nitpicks per PR gets ignored within a week. Instruct it to report only bugs and security issues, or keep its output short.
+- **Keep humans as the gate.** Automated comments are input. Approval stays with a person.
+- **Mind the secrets.** CI runs need an API key stored as a repository secret, and the review sends your code to the model provider. Check that's acceptable under your org's policy.
+
+<Exercise title="Fresh eyes on your last PR">
+
+1. Take your most recently merged PR.
+2. Check out the commit before merge and run the fresh-eyes review prompt.
+3. Classify each finding: real bug, valid but minor, or wrong.
+4. If it found a real bug that human review missed, open a ticket. Then add that bug class to your team's review checklist.
+
+</Exercise>
